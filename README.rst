@@ -20,32 +20,6 @@ Features
   * Show active processes.
   * Show total used memory.
 
-How to use
-===========
-
-   -Scan paper dictionary and save it in '.mvr' format 
-   or find already scanned and saved in .txt format dictionary 
-   and change it's extension form txt to mvr. 
-   mvr is an usual text format, which could be edited 
-   in any text editor. It was created for separation 
-   Movar dictionaries from other text files.
-
-   -Edit first four rows of the dictionary file as described below:
-        * First row — Title of yours dictionary
-        * Second row — Language pair, for example Eng-Eng
-        * Third row — Brief description of the dictionary
-        * Fourth row — Pattern from Regular Expressions for filtering terms from the dictionary,
-        		which must meet demands of Qt RegularExpression.
-        It's a condition of the Regex engine used in this version of the app. 
-
-   -Go to the Settings and choose folder with the file.
-        
-   You can find example of the formatting in the file called Webster dictionary(Gutenberg.org).mvr,
-   which located in the folder named Webster dictionary.
-
-   This application outputing a dictionary article through QWebEngineView.
-   Therefore you could use a HTML markup language for formatting yours dictionaries files.
-
 Authors
 ========
 
