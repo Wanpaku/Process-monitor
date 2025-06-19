@@ -23,16 +23,16 @@ along with Movar. If not, see <https://www.gnu.org/licenses/>.*/
 #include <QDir>
 #include <QDebug>
 #include <memory>
+#include <QPointer>
 
 auto main(int argc, char* argv[]) -> int
 {
     Logger::init();
-    qInfo() << QObject::tr("Start program.");
     std::unique_ptr<QApplication> app { std::make_unique<QApplication>(argc,
                                                                        argv) };
     QApplication::setWindowIcon(
         QIcon(":/icons/icons/content-management-system.png"));
-    std::unique_ptr<MainWindow> main_window { std::make_unique<MainWindow>() };
+    const QPointer<MainWindow> main_window = new MainWindow();
     main_window->show();
     return app->exec();
 }

@@ -21,46 +21,28 @@ along with Movar. If not, see <https://www.gnu.org/licenses/>.*/
 #include <QPainter>
 #include <QTimer>
 #include <QWidget>
+#include <future>
 
 class UsedMemoryWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit UsedMemoryWidget(const QString& os_name_,
-                              QWidget* parent = nullptr);
-    ~UsedMemoryWidget() override;
-    UsedMemoryWidget(const UsedMemoryWidget& src) = delete;
-    auto operator=(const UsedMemoryWidget& rhs) -> UsedMemoryWidget& = delete;
-    UsedMemoryWidget(const UsedMemoryWidget&& src) = delete;
-    auto operator=(const UsedMemoryWidget&& rhs) -> UsedMemoryWidget& = delete;
+    explicit UsedMemoryWidget(QWidget* parent = nullptr);
+    void load_used_memory_data();
+    void set_default_widget_settings();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    Dataloader* u_dataloader { nullptr };
     QTimer* used_memory_timer { nullptr };
-    const int used_memory_time_update { 60000 };
+    const int used_memory_time_update { 1000 };
     int current_used_memory_amount { 0 };
     double total_memory_amount { 0. };
     double used_memory_percent_double { 0 };
-    QString os_name;
-    bool abort_loading { false };
-    const QString linux_memory_program { "free" };
-    const QStringList linux_memory_args { "--mega" };
-    const QString windows_shell_program {
-        R"("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")"
-    };
-    const QStringList windows_memory_args {
-        "Get-CIMInstance", "Win32_OperatingSystem",   "|",
-        "Select-Object",   "TotalVisibleMemorySize,", "FreePhysicalMemory"
-    };
-    Dataloader* d_loader { nullptr };
+    const QString proc_mem_path { "/proc/meminfo" };
 
-    void set_connections();
+    void set_connections() const;
     void set_timer();
-    void load_used_memory_data(const QStringList& used_memory_list);
-    void starting_used_memory_load();
-    void set_default_widget_settings();
 
 signals:
     void memory_data_loaded();

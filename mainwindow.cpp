@@ -21,21 +21,22 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
-    os_name = QSysInfo::prettyProductName();
     load_settings();
     create_language_menu();
+    qInfo() << tr("Start program Process monitor.");
     starting_processes_load();
-    create_chartview();
+    create_used_memory_chartview();
+    create_used_cpu_chartview();
+    create_hard_disk_info_chartview();
     set_connections();
     set_update_timer();
 }
 
 MainWindow::~MainWindow()
 {
-    qInfo() << tr("Exit from the app");
     settings->deleteLater();
-    d_loader->deleteLater();
     delete ui;
 }
 
@@ -43,23 +44,29 @@ void MainWindow::starting_processes_load()
 {
     // Getting data about active processes through the thread
     if (!abort_loading) {
-        QString program { "" };
-        QStringList args;
-        if (os_name.contains("Linux")) {
-            program = linux_process_program;
-            args = linux_process_args;
-        } else if (os_name.contains("Windows")) {
-            program = windows_shell_program;
-            args = windows_process_args;
+
+        auto future = std::async(std::launch::async, [this]() {
+            const QScopedPointer<Dataloader> d_loader(new Dataloader());
+            auto data_list = d_loader->loading_linux_proc_processes_data();
+            return data_list;
+        });
+        std::priority_queue<info_tuple, std::vector<info_tuple>> columns;
+        try {
+            columns = future.get();
+            load_linux_processes_columns(columns);
+        } catch (std::exception& excep) {
+            timer_processes->stop();
+            const QString warn_message {
+                tr("Error happens during cpu data list loading: ")
+                + excep.what()
+            };
+            qCritical() << warn_message;
         }
 
-        d_loader = new Dataloader(program, args);
-        connect(d_loader, &Dataloader::sending_output, this,
-                &MainWindow::load_process_columns);
     } else {
         timer_processes->stop();
-        const QString warn_message { tr(
-            "Error with loading data.\n For details check the log file.") };
+        const QString warn_message { tr("Error happens during loading data.\n "
+                                        "For details check the log file.") };
         qCritical() << warn_message;
         QMessageBox::warning(nullptr, tr("Warning!"), warn_message,
                              QMessageBox::Ok);
@@ -190,9 +197,11 @@ void MainWindow::on_actionAbout_triggered()
     msgBox.setWindowTitle("Process monitor");
     msgBox.setText(
         tr("<b><p><center>Process monitor</b></p></center>"
-           "<p><center>Simple program that shows current processes and memory "
-           "consumption. Active processes updating once per second,  used "
-           "memory once per minute.</p></center>"
+           "<p><center>Simple program that shows current processes, memory "
+           "consumption, cpu usage and used space of the current hard disk. "
+           "All indicators "
+           "updating "
+           "once per second.</p></center>"
            "<p><center>The app icon created by "
            "<a href='https://www.flaticon.com/free-icon/"
            "content-management-system_2630878?term=system+monitor&page=1&"
@@ -203,8 +212,8 @@ void MainWindow::on_actionAbout_triggered()
            "License v3</a></p></center>"
            "<p><center>Copyright 2025 ©Teg Miles "
            "(movarocks2@gmail.com)</p></center>"));
-    msgBox.exec();
     qInfo() << tr("Watched About info");
+    msgBox.exec();
 }
 
 void MainWindow::set_update_timer()
@@ -216,19 +225,36 @@ void MainWindow::set_update_timer()
     timer_processes->start(processes_timer_count);
 }
 
-void MainWindow::load_process_columns(const QStringList& processes_list)
+void MainWindow::load_linux_processes_columns(
+    std::priority_queue<info_tuple, std::vector<info_tuple>>& columns)
 {
-    // Loading active processes to proper columns of the Qt table widget
-    if (processes_list.isEmpty()) {
+    if (columns.empty()) {
         abort_loading = true;
         qWarning() << "Processes data list is empty.";
     } else {
         ui->processes_table->clearContents();
         ui->processes_table->setRowCount(0);
-        if (os_name.contains("Linux")) {
-            linux_fill_processes_columns(processes_list);
-        } else if (os_name.contains("Windows")) {
-            windows_fill_processes_columns(processes_list);
+
+        while (!columns.empty()) {
+            auto [memory, name, pid, thrcount, stime, path, cpu_usage]
+                = columns.top();
+            columns.pop();
+            const int new_row = ui->processes_table->rowCount();
+            ui->processes_table->insertRow(new_row);
+
+            set_cell(new_row, static_cast<int>(TableColumns::PID), pid);
+            set_cell(new_row, static_cast<int>(TableColumns::Process_name),
+                     name);
+            set_cell(new_row, static_cast<int>(TableColumns::Memory_used),
+                     QString::number(memory));
+            set_cell(new_row, static_cast<int>(TableColumns::Thread_number),
+                     thrcount);
+            set_cell(new_row, static_cast<int>(TableColumns::Launch_time),
+                     stime);
+            set_cell(new_row, static_cast<int>(TableColumns::Path_to_file),
+                     path);
+            set_cell(new_row, static_cast<int>(TableColumns::CPU_percent),
+                     cpu_usage);
         }
 
         formatting_processes_table();
@@ -254,21 +280,6 @@ void MainWindow::formatting_processes_table()
     }
 }
 
-auto MainWindow::get_reg_proc(const QRegularExpression& reg_proc,
-                              const QString& list_item, const QString& title)
-{
-    // Catch processes categories by regex
-    const QRegularExpressionMatch match_pid = reg_proc.match(list_item);
-    QString result;
-    if (match_pid.hasMatch()) {
-        result = match_pid.captured(0);
-    } else {
-        result = "--";
-    }
-
-    return result;
-}
-
 void MainWindow::set_cell(const int new_row, const int column,
                           const QString& content)
 {
@@ -277,87 +288,16 @@ void MainWindow::set_cell(const int new_row, const int column,
                                  (new QTableWidgetItem(content)));
 }
 
-void MainWindow::linux_fill_processes_columns(
-    const QStringList& processes_list)
-{
-    // Get linux content for processes table and inserting it
-    const QRegularExpression pid_reg(R"(^(?<pid>[0-9]+))");
-    const QRegularExpression name_reg(R"((?<=#)(?<name>.+)(?=\s*\|))");
-    const QRegularExpression mem_reg(R"((?<memory>(?<=\|)\d+(?=\s)))");
-    const QRegularExpression thrc_reg(R"((?<thrcount>(?<=\d\s)\d+(?=\s)+))");
-    const QRegularExpression time_reg(
-        R"((?<time>(?<=\d\s)((\d+:\d+)|(\W*\d+)|(\w*\d+))(?=(\s\/)|(\s-))))");
-    const QRegularExpression path_reg(R"((?<=\s)(?<path>\/.+)$)");
-
-    for (const auto& list_row : std::as_const(processes_list)) {
-        const QString pid = get_reg_proc(pid_reg, list_row, "pid");
-        const QString name = get_reg_proc(name_reg, list_row, "name");
-        const QString memory = get_reg_proc(mem_reg, list_row, "memory");
-        const QString thrcount = get_reg_proc(thrc_reg, list_row, "thrcount");
-        const QString time = get_reg_proc(time_reg, list_row, "time");
-        const QString path = get_reg_proc(path_reg, list_row, "path");
-
-        const int new_row = ui->processes_table->rowCount();
-        ui->processes_table->insertRow(new_row);
-
-        set_cell(new_row, static_cast<int>(TableColumns::PID), pid);
-        set_cell(new_row, static_cast<int>(TableColumns::Process_name), name);
-
-        constexpr double kilobytes_in_megabyte { 1024. };
-        const double used_memory_mb
-            = memory.toDouble() / kilobytes_in_megabyte;
-        const QString used_memory_mb_str
-            = QString::number(used_memory_mb, 'f', 1);
-
-        set_cell(new_row, static_cast<int>(TableColumns::Memory_used),
-                 used_memory_mb_str);
-        set_cell(new_row, static_cast<int>(TableColumns::Thread_number),
-                 thrcount);
-        set_cell(new_row, static_cast<int>(TableColumns::Launch_time), time);
-        set_cell(new_row, static_cast<int>(TableColumns::Path_to_file), path);
-    }
-}
-
-void MainWindow::windows_fill_processes_columns(
-    const QStringList& processes_list)
-{
-    // Get windows content for processes table and inserting it
-    const QRegularExpression pid_reg(R"(^(?<pid>[0-9]+))");
-    const QRegularExpression name_reg(
-        R"((?<=\s)(?<name>([A-z_\-\.]+\w+))(?=\s))");
-    const QRegularExpression mem_reg(R"((?<=(\s))(?<memory>\d+,\d\d))");
-    const QRegularExpression thrc_reg(
-        R"((?<=\|\s)(?<thrcount>\d+)(?=(\s\|)|(\s\d)))");
-    const QRegularExpression time_reg(
-        R"((?<time>(\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d)))");
-    const QRegularExpression path_reg(R"((?<=\|\s)(?<path>([\w+]:\\.*))$)");
-
-    for (const auto& list_row : processes_list) {
-        const QString pid = get_reg_proc(pid_reg, list_row, "pid");
-        const QString name = get_reg_proc(name_reg, list_row, "name");
-        const QString memory = get_reg_proc(mem_reg, list_row, "memory");
-        const QString thrcount = get_reg_proc(thrc_reg, list_row, "thrcount");
-        const QString time = get_reg_proc(time_reg, list_row, "time");
-        const QString path = get_reg_proc(path_reg, list_row, "path");
-
-        const int new_row = ui->processes_table->rowCount();
-        ui->processes_table->insertRow(new_row);
-
-        set_cell(new_row, static_cast<int>(TableColumns::PID), pid);
-        set_cell(new_row, static_cast<int>(TableColumns::Process_name), name);
-
-        set_cell(new_row, static_cast<int>(TableColumns::Memory_used), memory);
-        set_cell(new_row, static_cast<int>(TableColumns::Thread_number),
-                 thrcount);
-        set_cell(new_row, static_cast<int>(TableColumns::Launch_time), time);
-        set_cell(new_row, static_cast<int>(TableColumns::Path_to_file), path);
-    }
-}
-
 void MainWindow::on_processes_table_itemSelectionChanged()
 {
     // Remembering current selected row
     selected_row = ui->processes_table->currentRow();
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    qInfo() << tr("Exit from the app");
+    event->accept();
 }
 
 void MainWindow::set_connections()
@@ -438,17 +378,9 @@ void MainWindow::kill_process_exec(const QString& pid, const QString& name)
             &MainWindow::kill_process_finished);
     connect(process, &QProcess::errorOccurred, this,
             &MainWindow::handle_kill_process_qprocess_error);
-    if (os_name.contains("Linux")) {
 
-        linux_kill_process_args.append(pid);
-        process->start(linux_kill_process_program, linux_kill_process_args);
-
-    } else if (os_name.contains("Windows")) {
-
-        windows_kill_process_args.append(name);
-        process->start(windows_kill_process_program,
-                       windows_kill_process_args);
-    }
+    linux_kill_process_args.append(pid);
+    process->start(linux_kill_process_program, linux_kill_process_args);
 }
 
 void MainWindow::handle_kill_process_std_error()
@@ -494,10 +426,43 @@ void MainWindow::MainWindow::handle_kill_process_qprocess_error(
                          QMessageBox::Ok);
 }
 
-void MainWindow::create_chartview()
+void MainWindow::create_used_memory_chartview()
 {
     // Creating widget for showing total used memory
-    mem_widget = new UsedMemoryWidget(os_name, this);
-    ui->memory_vert_layout->addWidget(mem_widget);
-    ui->memory_vert_layout->setStretch(1, 1);
+    UsedMemoryWidget* mem_widget = new UsedMemoryWidget(this);
+    auto* mem_layout = ui->memory_group_box->layout();
+    if (mem_layout != nullptr) {
+        auto* hor_layout = qobject_cast<QHBoxLayout*>(mem_layout);
+        if (hor_layout != nullptr) {
+            hor_layout->addWidget(mem_widget);
+        }
+    }
+    mem_layout->addWidget(mem_widget);
+    mem_widget->load_used_memory_data();
+}
+
+void MainWindow::create_used_cpu_chartview()
+{
+    UsedCPUWidget* cpu_widget = new UsedCPUWidget(this);
+    auto* cpu_layout = ui->used_cpu_groupbox->layout();
+    if (cpu_layout != nullptr) {
+        auto* hor_layout = qobject_cast<QHBoxLayout*>(cpu_layout);
+        if (hor_layout != nullptr) {
+            hor_layout->addWidget(cpu_widget);
+        }
+    }
+    cpu_widget->loading_cpu_data();
+}
+
+void MainWindow::create_hard_disk_info_chartview()
+{
+    HardDiskWidget* hard_disk_widget = new HardDiskWidget(this);
+    auto* hard_disk_layout = ui->hard_disk_groupbox->layout();
+    if (hard_disk_layout != nullptr) {
+        auto* hor_layout = qobject_cast<QHBoxLayout*>(hard_disk_layout);
+        if (hor_layout != nullptr) {
+            hor_layout->addWidget(hard_disk_widget);
+        }
+    }
+    hard_disk_widget->loading_hard_disks_info();
 }

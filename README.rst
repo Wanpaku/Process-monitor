@@ -6,7 +6,7 @@ About Process monitor application
 Description
 ===========
 
-This program created showing active processes and used memory.
+This program created showing active processes, used memory, CPU usage and hard disk space.
 
 Copyright (C) 2025  Teg Miles.
 Process monitor is free software: you can redistribute it and/or modify it
@@ -19,6 +19,9 @@ Features
 
   * Show active processes.
   * Show total used memory.
+  * Show CPU usage.
+  * Show current hard disk used space.
+  * An active process can be deleted through the context menu.
 
 Authors
 ========
@@ -33,7 +36,6 @@ Requirements
 
 One of the following operating systems:
 
-* **Microsoft Windows**: 64-bit Windows 11 or higher
 * **Linux**: x86_64 with kernel 6.14.0 or higher.  *Manjaro 23.0.0 (or newer) recommended.*
 
 
@@ -47,5 +49,4 @@ in a directory appropriate to your OS.  Refer to this table:
 System     Directory
 ========== ==============================================
 Linux, BSD ``$XDG_HOME/`` if defined, else ``~/.config/``
-Windows    ``\HKEY_CURRENT_USER\Software\Process_monitor``
 ========== ==============================================

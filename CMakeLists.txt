@@ -24,6 +24,8 @@ qt_add_executable(${PROJECT_NAME}
         logger.h logger.cpp
         usedmemorywidget.h
         usedmemorywidget.cpp
+        usedcpuwidget.h usedcpuwidget.cpp
+        harddiskwidget.h harddiskwidget.cpp
 )
 
 qt_add_translations(${PROJECT_NAME}
