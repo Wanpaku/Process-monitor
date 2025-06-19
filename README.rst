@@ -5,7 +5,7 @@ About Process monitor application
 Screenshots
 ===========
 
-![](screenshots/Process_monitor_eng.png)
+<img src="screenshots/Process_monitor_eng.png">
 
 Description
 ===========
