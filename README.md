@@ -48,7 +48,6 @@ Configuration
 Configuration for the application is stored in the ``Process_monitor.conf`` file or registry item
 in a directory appropriate to your OS.  Refer to this table:
 
-========== ==============================================
 System     Directory
 ========== ==============================================
 Linux, BSD ``$XDG_HOME/`` if defined, else ``~/.config/``
