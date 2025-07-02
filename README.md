@@ -9,7 +9,7 @@ Screenshots
 Description
 ===========
 
-This program created showing active processes, used memory, CPU usage and hard disk space.
+This program created for showing active processes, used memory, CPU usage and hard disk space.
 
 Copyright (C) 2025  Teg Miles.
 Process monitor is free software: you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ Requirements
 
 * Qt6 (6.6.1 or newer), CMake (3.16 or newer), C++ compiler (GCC, Clang or MSVC).
 
-One of the following operating systems:
+Operating system:
 
 * **Linux**: x86_64 with kernel 6.14.0 or higher.  *Manjaro 23.0.0 (or newer) recommended.*
 
@@ -46,7 +46,9 @@ Configuration
 =============
 
 Configuration for the application is stored in the ``Process_monitor.conf`` file or registry item
-in a directory appropriate to your OS.  Refer to this table:
+in a directory appropriate to your OS.  
+
+Refer to this table:
 
 System     Directory
 =====================
