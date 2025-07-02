@@ -1,4 +1,4 @@
-/*Copyright (C) 2024  Teg Miles
+/*Copyright (C) 2025  Teg Miles
  This file is part of Process monitor.
 
 Movar is free software: you can redistribute it and/or modify it
@@ -12,7 +12,7 @@ of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Movar. If not, see <https://www.gnu.org/licenses/>.*/
+along with Process monitor. If not, see <https://www.gnu.org/licenses/>.*/
 
 #include "logger.h"
 
